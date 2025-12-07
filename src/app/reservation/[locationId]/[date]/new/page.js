@@ -1,210 +1,267 @@
-'use client';
-import Layout from '@/components/Layout';
-import { useParams, useRouter } from 'next/navigation';
-import { useState, useMemo } from 'react';
-import dayjs from 'dayjs';
+    'use client';
+    import { useState, useEffect, useMemo } from 'react';
+    import Layout from '@/components/Layout';
+    import { useParams, useRouter } from 'next/navigation';
+    import db from '@/services/DatabaseService'; // Pastikan Service sudah diupdate
+    import dayjs from 'dayjs';
+    import ModalConfirm from '@/components/ModalConfirm';
+    import ModalInfo from '@/components/ModalInfo';
 
-// --- Data Dummy ---
-const MOCK_LOCATIONS = {
-    'sport-center': 'Sport Center',
-    'embassy-sport': 'Embassy Sport Hall',
-};
-
-// Data lapangan dummy dengan harga per jam yang berbeda
-const MOCK_FIELDS = [
-    { id: 'futsal1', name: 'Lapangan Futsal 1', price: 60000 },
-    { id: 'futsal2', name: 'Lapangan Futsal 2', price: 75000 },
-    { id: 'futsal3', name: 'Lapangan Futsal 3', price: 50000 },
-];
-
-// Daftar semua slot waktu 1 jam
-const ALL_SLOTS = [
-    '08.00 - 09.00 WIB', '09.00 - 10.00 WIB', '10.00 - 11.00 WIB', '11.00 - 12.00 WIB',
-    '12.00 - 13.00 WIB', '13.00 - 14.00 WIB', '14.00 - 15.00 WIB', '15.00 - 16.00 WIB',
-    '16.00 - 17.00 WIB', '17.00 - 18.00 WIB', '18.00 - 19.00 WIB', '19.00 - 20.00 WIB',
-    '20.00 - 21.00 WIB', '21.00 - 22.00 WIB', '22.00 - 23.00 WIB', '23.00 - 00.00 WIB',
-];
-
-// Dummy slot yang sudah dipesan (berubah berdasarkan lapangan yang dipilih)
-const BOOKED_SLOTS = {
-    'futsal1': ['08.00 - 09.00 WIB', '10.00 - 11.00 WIB'], // Merah
-    'futsal2': ['14.00 - 15.00 WIB', '15.00 - 16.00 WIB'],
-    'futsal3': ['18.00 - 19.00 WIB'],
-};
-
-// Fungsi pembantu untuk memformat Rupiah
-const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 2,
-    }).format(amount);
-};
-
-
-export default function NewReservationPage() {
-    const params = useParams();
-    const router = useRouter();
-
-    const locationId = params.locationId;
-    const dateString = params.date; 
-
-    const locationName = MOCK_LOCATIONS[locationId] || "Nama Tempat";
-    const formattedDate = dayjs(dateString).format('DD-MM-YYYY');
-    
-    // --- State Management ---
-    // Default Lapangan Futsal 1 yang dipilih
-    const [selectedFieldId, setSelectedFieldId] = useState(MOCK_FIELDS[0].id); 
-    
-    // ⭐️ PERBAIKAN: Set default state menjadi array kosong
-    const [selectedSlots, setSelectedSlots] = useState([]); 
-
-    const selectedField = MOCK_FIELDS.find(f => f.id === selectedFieldId);
-    
-    // --- Calculation: Hitung Total Harga ---
-    const totalPrice = useMemo(() => {
-        // Total harga = Jumlah jam x Harga per jam lapangan yang dipilih
-        if (selectedField) {
-            return selectedSlots.length * selectedField.price;
-        }
-        return 0;
-    }, [selectedSlots, selectedField]);
-    
-    const bookedSlotsForField = BOOKED_SLOTS[selectedFieldId] || [];
-
-    // --- Handlers ---
-    const handleFieldChange = (e) => {
-        // Reset slot yang dipilih ketika user mengganti lapangan
-        setSelectedFieldId(e.target.value);
-        setSelectedSlots([]);
-    };
-
-    const handleSlotClick = (slot) => {
-        // Jika slot sudah dipesan, batalkan aksi klik
-        if (bookedSlotsForField.includes(slot)) {
-            return;
-        }
-
-        setSelectedSlots(prev => {
-            if (prev.includes(slot)) {
-                // Hapus slot jika sudah dipilih (Deselect)
-                return prev.filter(s => s !== slot);
-            } else {
-                // Tambahkan slot baru (Select) dan urutkan untuk tampilan konsisten
-                return [...prev, slot].sort(); 
-            }
-        });
-    };
-
-    const handleReservationSubmit = () => {
-        if (selectedSlots.length === 0) {
-            alert("Harap pilih minimal satu jadwal untuk reservasi.");
-            return;
-        }
+    export default function NewReservationPage() {
+        const params = useParams();
+        const router = useRouter();
         
-        // Simulasikan navigasi ke halaman pembayaran
-        alert(`Reservasi diajukan untuk ${selectedField.name} pada ${formattedDate} selama ${selectedSlots.length} jam. Total: ${formatCurrency(totalPrice)}`);
-        // router.push('/payment'); // Implementasi navigasi ke halaman pembayaran berikutnya
-    };
+        const [locationData, setLocationData] = useState(null);
+        const [courts, setCourts] = useState([]);
+        
+        // State Reservasi sekarang diisi dari API
+        const [existingReservations, setExistingReservations] = useState([]); 
+        const [isLoading, setIsLoading] = useState(true); // Indikator Loading
 
-    // --- Component Rendering Helper ---
-    const getSlotClass = (slot) => {
-        if (bookedSlotsForField.includes(slot)) {
-            // Merah (Jadwal tidak tersedia)
-            return 'text-red-600 font-bold cursor-not-allowed'; 
-        } else if (selectedSlots.includes(slot)) {
-            // Biru Muda Transparan (Jadwal terpilih)
-            // Sesuai desain image_4673fa.png
-            return 'bg-blue-100 text-gray-800 font-bold border border-blue-500 cursor-pointer'; 
-        } else {
-            // Tersedia
-            return 'text-gray-800 hover:bg-gray-100 cursor-pointer'; 
-        }
-    };
+        const [currentUser, setCurrentUser] = useState(null);
+        const [selectedCourtId, setSelectedCourtId] = useState("");
+        const [selectedSlots, setSelectedSlots] = useState([]);
+        const [generatedSlots, setGeneratedSlots] = useState([]);
 
-    return (
-        <Layout 
-            showHeader={true} 
-            headerTitle={locationName} 
-            showBackButton={true}
-            showSidebar={true}
-        >
-            <div className="bg-white p-6 rounded-lg shadow-xl border border-gray-300 max-w-4xl mx-auto">
+        const [showConfirm, setShowConfirm] = useState(false);
+        const [modalInfo, setModalInfo] = useState({ show: false, title: '', message: '', type: '' });
+
+        // Helpers
+        const generateTimeSlots = (startHour, endHour) => {
+            let slots = [];
+            for (let i = startHour; i < endHour; i++) {
+                const start = String(i).padStart(2, '0');
+                const end = String(i + 1).padStart(2, '0');
+                slots.push(`${start}.00 - ${end}.00`);
+            }
+            return slots;
+        };
+
+        const isBreakTime = (slotStr) => {
+            if (!locationData?.breakHours) return false;
+            const startHour = parseInt(slotStr.split('.')[0]); 
+            return locationData.breakHours.includes(startHour);
+        };
+
+        // --- LOAD DATA (DENGAN API) ---
+        useEffect(() => {
+            const initData = async () => {
+                setIsLoading(true);
                 
-                {/* Header: Tanggal & Dropdown Lapangan */}
-                <div className="flex justify-between items-center mb-6">
-                    <p className="text-xl font-bold text-gray-800">{formattedDate}</p>
-                    
-                    <select 
-                        value={selectedFieldId}
-                        onChange={handleFieldChange}
-                        className="p-2 border border-gray-400 rounded-md bg-white text-gray-800 font-semibold shadow-sm"
-                    >
-                        {MOCK_FIELDS.map(field => (
-                            <option key={field.id} value={field.id}>
-                                {field.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                // 1. User Local
+                const user = JSON.parse(localStorage.getItem('currentUser'));
+                setCurrentUser(user);
 
-                {/* Main Content: Jadwal & Ringkasan */}
-                <div className="grid md:grid-cols-2 gap-6 bg-gray-50 p-6 border border-gray-300 rounded-lg">
-                    
-                    {/* Kolom Kiri: Daftar Jadwal */}
-                    <div className="border border-gray-300 p-4 bg-white h-[400px] overflow-y-auto shadow-inner">
-                        {ALL_SLOTS.map(slot => (
-                            <div 
-                                key={slot}
-                                className={`text-lg py-2 px-3 mb-1 rounded-md transition duration-100 ${getSlotClass(slot)}`}
-                                onClick={() => handleSlotClick(slot)}
-                            >
-                                {slot}
-                            </div>
-                        ))}
-                    </div>
+                // 2. Data Static (Lokasi & Lapangan) - Masih dari Memory (Aman utk static data)
+                const loc = db.getFieldById(params.locationId);
+                if (loc) {
+                    setLocationData(loc);
+                    setGeneratedSlots(generateTimeSlots(loc.openHour, loc.closeHour));
+                }
+                const courtsData = db.getCourtsByLocation(params.locationId);
+                setCourts(courtsData);
+                if (courtsData.length > 0) setSelectedCourtId(courtsData[0].id);
 
-                    {/* Kolom Kanan: Jadwal Dipilih & Total Harga */}
-                    <div className="flex flex-col space-y-6">
-                        
-                        {/* Box Jadwal Yang Dipilih */}
-                        <div className="border border-gray-300 p-4 flex-1 bg-white shadow-sm">
-                            <h4 className="text-lg font-bold mb-3">Jadwal Yang Dipilih :</h4>
-                            <div className="space-y-1 h-48 overflow-y-auto">
-                                {selectedSlots.length > 0 ? (
-                                    selectedSlots.map(slot => (
-                                        // Teks biru sesuai desain image_4673fa.png
-                                        <p key={slot} className="text-lg text-blue-700 font-semibold">
-                                            {slot}
-                                        </p>
-                                    ))
-                                ) : (
-                                    <p className="text-gray-500 italic text-sm">Belum ada jadwal yang dipilih.</p>
-                                )}
-                            </div>
-                        </div>
+                // 3. Data Dinamis (Reservasi) - AMBIL DARI API SERVER!
+                // Ini memastikan kita melihat data real-time dari file JSON
+                const apiReservations = await db.fetchReservationsAPI(params.date);
+                setExistingReservations(apiReservations);
+                
+                setIsLoading(false);
+            };
 
-                        {/* Box Total Harga */}
-                        <div className="p-4 bg-gray-100 border border-gray-400">
-                            <h4 className="text-lg font-bold mb-3">Total Harga :</h4>
-                            <div className="bg-white p-2 border border-gray-300 rounded-sm">
-                                <p className="text-2xl font-extrabold text-gray-800">
-                                    {formatCurrency(totalPrice)}
-                                </p>
-                            </div>
-                        </div>
+            initData();
+        }, [params.locationId, params.date]);
 
-                        {/* Tombol Reservasi (Warna Oranye sesuai tema) */}
-                        <button 
-                            onClick={handleReservationSubmit}
-                            className="w-full bg-[#E86500] hover:bg-[#C95500] text-white font-bold py-3 rounded-md text-lg shadow-lg transition duration-200 mt-auto"
+        // Logic Status Slot (My Pending = Kuning, Booked = Merah)
+        const getSlotStatus = (slot) => {
+            if (isBreakTime(slot)) return 'break';
+            if (selectedSlots.includes(slot)) return 'selected';
+
+            const reservation = existingReservations.find(r => 
+                r.courtId === selectedCourtId && r.timeSlots.includes(slot)
+            );
+
+            if (!reservation) return 'available';
+
+            const isMine = currentUser && reservation.userId === currentUser.id;
+
+            if (isMine) {
+                if (reservation.status === 'pending') return 'my_pending'; // Kuning
+                return 'booked'; // Merah
+            } else {
+                if (reservation.status === 'pending') return 'available'; // Putih
+                return 'booked'; // Merah
+            }
+        };
+
+        const currentCourt = courts.find(c => c.id === selectedCourtId);
+        const totalPrice = (currentCourt?.pricePerHour || 0) * selectedSlots.length;
+
+        const handleSlotClick = (slot) => {
+            const status = getSlotStatus(slot);
+            if (status !== 'available' && status !== 'selected') return;
+
+            if (selectedSlots.includes(slot)) {
+                setSelectedSlots(prev => prev.filter(s => s !== slot));
+            } else {
+                setSelectedSlots(prev => [...prev, slot].sort());
+            }
+        };
+
+        const handlePreSubmit = () => {
+            if (selectedSlots.length === 0) {
+                setModalInfo({ show: true, title: "VALIDASI", message: "Pilih minimal 1 slot waktu!", type: "error" });
+                return;
+            }
+            if (!currentUser) {
+                setModalInfo({ show: true, title: "AKSES DITOLAK", message: "Anda harus login terlebih dahulu.", type: "error" });
+                return;
+            }
+            setShowConfirm(true);
+        };
+
+        const handleConfirmSubmit = async () => {
+            setShowConfirm(false);
+            try {
+                // Write ke API
+                await db.createReservation(
+                    currentUser.id,
+                    selectedCourtId,
+                    params.date,
+                    selectedSlots,
+                    totalPrice
+                );
+                
+                // Refresh Data API agar tampilan langsung update tanpa reload page
+                const updatedData = await db.fetchReservationsAPI(params.date);
+                setExistingReservations(updatedData);
+                setSelectedSlots([]); // Reset pilihan
+
+                setModalInfo({
+                    show: true,
+                    title: "BERHASIL",
+                    message: "Reservasi Berhasil Diajukan! Status: Menunggu Konfirmasi Admin.",
+                    type: "success"
+                });
+            } catch (error) {
+                setModalInfo({ show: true, title: "GAGAL", message: error.message, type: "error" });
+            }
+        };
+
+        const handleCloseModalInfo = () => {
+            setModalInfo({ ...modalInfo, show: false });
+            if (modalInfo.type === 'success') {
+                // Opsional: Redirect atau tetap di halaman
+                // router.push(...) 
+            }
+        };
+
+        // Styling Class
+        const getSlotClass = (status) => {
+            switch (status) {
+                case 'break': return 'bg-gray-200 text-gray-400 cursor-not-allowed italic border-gray-300';
+                case 'booked': return 'bg-red-500 text-white cursor-not-allowed opacity-80 border-red-600';
+                case 'my_pending': return 'bg-yellow-100 text-yellow-700 cursor-not-allowed border-yellow-400 font-bold';
+                case 'selected': return 'bg-blue-100 text-blue-700 border-blue-500 font-bold shadow-md';
+                default: return 'bg-white hover:bg-gray-50 text-gray-700 cursor-pointer border-gray-200';
+            }
+        };
+
+        const getStatusLabel = (status) => {
+            if (status === 'booked') return <span className="text-xs bg-white text-red-500 px-2 rounded font-bold">Booked</span>;
+            if (status === 'my_pending') return <span className="text-[10px] bg-yellow-500 text-white px-2 py-0.5 rounded font-bold uppercase">Menunggu</span>;
+            if (status === 'break') return <span className="text-xs bg-gray-400 text-white px-2 rounded font-bold">Istirahat</span>;
+            if (status === 'selected') return <span className="text-xs bg-blue-500 text-white px-2 rounded">Dipilih</span>;
+            return null;
+        };
+
+        return (
+            <Layout showHeader={true} headerTitle={locationData?.name} showBackButton={true} backUrl={`/reservation/${params.locationId}/${params.date}`} showSidebar={true}>
+                
+                {showConfirm && (
+                    <ModalConfirm 
+                        title={`Konfirmasi Reservasi:\n${selectedSlots.length} slot di ${currentCourt?.name}?`}
+                        onConfirm={handleConfirmSubmit}
+                        onCancel={() => setShowConfirm(false)}
+                    />
+                )}
+
+                {modalInfo.show && (
+                    <ModalInfo 
+                        title={modalInfo.title}
+                        description={modalInfo.message}
+                        type={modalInfo.type}
+                        onClose={handleCloseModalInfo}
+                    />
+                )}
+
+                <div className="bg-white p-6 rounded-lg shadow-xl max-w-4xl mx-auto border border-gray-200">
+                    <h2 className="text-xl font-bold mb-4 text-gray-800">
+                        Buat Reservasi: {dayjs(params.date).format('DD MMM YYYY')}
+                    </h2>
+
+                    {/* Dropdown Lapangan */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Lapangan</label>
+                        <select 
+                            className="w-full p-2 border border-gray-300 rounded-md outline-none text-black font-medium"
+                            value={selectedCourtId}
+                            onChange={(e) => { setSelectedCourtId(e.target.value); setSelectedSlots([]); }}
                         >
-                            RESERVASI
-                        </button>
+                            {courts.map(c => (
+                                <option key={c.id} value={c.id} className="text-black">
+                                    {c.name} - Rp {c.pricePerHour.toLocaleString()}/jam
+                                </option>
+                            ))}
+                        </select>
                     </div>
-                </div>
 
-            </div>
-        </Layout>
-    );
-}
+                    {isLoading ? (
+                        <div className="text-center py-10 text-gray-500">Memuat Jadwal dari Server...</div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 gap-6">
+                            {/* Jadwal Grid */}
+                            <div className="border border-gray-300 p-4 rounded-md h-[400px] overflow-y-auto bg-gray-50">
+                                <div className="flex justify-between items-center mb-2 text-sm text-gray-600">
+                                    <span>Jam Operasional: {locationData?.openHour}.00 - {locationData?.closeHour}.00</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {generatedSlots.map(slot => {
+                                        const status = getSlotStatus(slot);
+                                        return (
+                                            <div 
+                                                key={slot} 
+                                                onClick={() => handleSlotClick(slot)} 
+                                                className={`p-3 border rounded-md text-center flex justify-between items-center px-4 transition-all ${getSlotClass(status)}`}
+                                            >
+                                                <span className="font-medium">{slot}</span>
+                                                {getStatusLabel(status)}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Ringkasan Panel */}
+                            <div className="flex flex-col border border-gray-200 p-5 rounded-md bg-white shadow-sm h-full">
+                                <h3 className="font-bold mb-4 border-b pb-2">Ringkasan</h3>
+                                <div className="flex-1 overflow-y-auto max-h-[200px]">
+                                    {selectedSlots.length > 0 ? selectedSlots.map(s => <p key={s} className="text-blue-600 font-medium">• {s}</p>) : <p className="text-gray-400 italic">Belum ada slot dipilih.</p>}
+                                </div>
+                                <div className="border-t pt-4 mt-auto">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-gray-800 font-bold">Total:</span>
+                                        <span className="text-2xl font-extrabold text-[#E86500]">Rp {totalPrice.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <button onClick={handlePreSubmit} disabled={selectedSlots.length === 0} className={`w-full mt-4 py-3 rounded font-bold text-white transition ${selectedSlots.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#E86500] hover:bg-[#C95500]'}`}>
+                                    AJUKAN RESERVASI
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Layout>
+        );
+    }

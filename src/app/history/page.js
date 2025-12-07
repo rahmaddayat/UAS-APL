@@ -1,24 +1,66 @@
-// src/app/history/page.js
 'use client';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import HistoryCardComponent from '@/components/HistoryCardComponent'; 
+import TransactionCardComponent from '@/components/TransactionCardComponent';
+import db from '@/services/DatabaseService';
 import { useRouter } from 'next/navigation'; 
 
-// --- Data Dummy Riwayat Transaksi LENGKAP ---
-const RAW_HISTORY_TRANSACTIONS = [
-    { id: 101, locationName: 'Sport Center', fieldName: 'Lapangan Futsal 1', status: 'completed', date: '2025-11-20' },
-    { id: 102, locationName: 'Embassy Sport', fieldName: 'Lapangan Futsal 2', status: 'cancelled', date: '2025-11-25' },
-    { id: 103, locationName: 'Home Futsal', fieldName: 'Lapangan Futsal A', status: 'completed', date: '2025-11-28' },
-];
-
 export default function HistoryPage() {
-    
-    // SOLUSI: Filter KETAT! HANYA status 'completed' yang ditampilkan.
-    const COMPLETED_TRANSACTIONS = RAW_HISTORY_TRANSACTIONS.filter(
-        transaction => transaction.status === 'completed' 
-    );
-    
+    const router = useRouter();
+    const [historyData, setHistoryData] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
     const containerClasses = "p-6 max-w-4xl mx-auto";
+
+    useEffect(() => {
+        const loadHistory = async () => {
+            setIsLoading(true);
+
+            // 1. Cek User Login
+            const user = JSON.parse(localStorage.getItem('currentUser'));
+            if (!user) {
+                router.push('/login');
+                return;
+            }
+
+            // 2. Ambil Data
+            const allCourts = db.data.courts; 
+            const allFields = db.data.fields;
+            const allReservations = await db.fetchReservationsAPI();
+
+            // 3. Filter Data
+            const processedData = allReservations
+                .filter(res => {
+                    const isMyData = String(res.userId) === String(user.id);
+                    // UPDATED: 'canceled'
+                    const isHistoryStatus = ['paid', 'canceled', 'rejected'].includes(res.status);
+                    
+                    return isMyData && isHistoryStatus;
+                })
+                .map(res => {
+                    const court = allCourts.find(c => c.id === res.courtId);
+                    const location = court ? allFields.find(f => f.id === court.fieldId) : null;
+
+                    return {
+                        id: res.id,
+                        locationName: location ? location.name : 'Unknown Location',
+                        fieldName: court ? court.name : 'Unknown Court',
+                        status: res.status, 
+                        date: res.date,
+                        totalPrice: res.totalPrice,
+                        timeSlots: res.timeSlots
+                    };
+                });
+
+            // 4. Sort Descending
+            processedData.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            setHistoryData(processedData);
+            setIsLoading(false);
+        };
+
+        loadHistory();
+    }, [router]);
 
     return (
         <Layout 
@@ -26,29 +68,29 @@ export default function HistoryPage() {
             headerTitle="Riwayat" 
             activeMenu="Riwayat" 
             showSidebar={true}
+            showBackButton={false}
         >
-            {COMPLETED_TRANSACTIONS.length > 0 ? (
-                
-                <div className={containerClasses}>
+            <div className={containerClasses}>
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-64">
+                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
+                    </div>
+                ) : historyData.length > 0 ? (
                     <div className="space-y-4">
-                        {COMPLETED_TRANSACTIONS.map(transaction => (
-                            <HistoryCardComponent 
+                        {historyData.map(transaction => (
+                            <TransactionCardComponent 
                                 key={transaction.id}
                                 transaction={transaction}
                             />
                         ))}
                     </div>
-                </div>
-            ) : (
-                // Empty state (sesuai image_1cacd4.png, tanpa header "Riwayat Transaksi")
-                <div className="flex justify-center items-center h-[calc(100vh-80px)]">
-                    <div className="bg-white p-6 rounded-lg shadow-xl border border-gray-300">
-                        <p className="text-xl font-normal text-gray-500 italic">
-                            Belum ada riwayat reservasi yang dilakukan
-                        </p>
-                    </div>
-                </div>
-            )}
+                ) : (
+                    // Empty state
+                     <div className="text-center py-10 bg-gray-50 border border-gray-200 rounded-lg">
+                           <p className="text-gray-500">Belum ada reservasi yang dilakukan</p>
+                       </div>
+                )}
+            </div>
         </Layout>
     );
 }

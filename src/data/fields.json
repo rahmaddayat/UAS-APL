@@ -1,0 +1,38 @@
+[
+  {
+    "id": "loc-1",
+    "name": "Sport Center Jakarta",
+    "address": "Jl. Sudirman No. 1, Jakarta",
+    "image": "/assets/sport-center.jpg",
+    "closedDays": [
+      0,
+      3
+    ],
+    "specificClosedDates": [
+      "2025-12-20"
+    ],
+    "openHour": 7,
+    "closeHour": 24,
+    "breakHours": [
+      12,
+      18,
+      19
+    ]
+  },
+  {
+    "id": "loc-2",
+    "name": "Embassy Sport Hall",
+    "address": "Jl. Asia Afrika, Bandung",
+    "image": "/assets/embassy.jpg",
+    "closedDays": [
+      6,
+      0
+    ],
+    "specificClosedDates": [],
+    "openHour": 10,
+    "closeHour": 20,
+    "breakHours": [
+      12
+    ]
+  }
+]

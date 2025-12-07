@@ -1,45 +1,35 @@
-// src/app/admin/profile/page.js
-'use client'; // Pastikan ini ada di baris pertama!
+'use client'; 
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout'; 
-import { UserCircleIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { UserCircleIcon, EyeIcon, EyeSlashIcon, ShieldCheckIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import db from '@/services/DatabaseService'; 
 
-// --- DUMMY DATA PROFIL ADMIN ---
-const DUMMY_ADMIN_PROFILE = {
-    userID: '14152135141412',
-    username: 'Admin_SportField',
-    email: 'admin@sportfield.com',
-    password: 'mysecureadminpassword', 
-};
-
-/**
- * Komponen Input Field Khusus untuk Profil (READ-ONLY)
- */
-const ProfileField = ({ label, value, type = 'text' }) => {
+// --- KOMPONEN INPUT READ-ONLY ---
+const ProfileField = ({ label, value, type = 'text', icon = null }) => {
     const [showPassword, setShowPassword] = useState(false);
-    
     const inputType = (type === 'password' && showPassword) ? 'text' : type;
 
     return (
         <div className="flex flex-col font-mono">
-            <label className="text-black font-bold mb-1">{label}</label>
+            <label className="text-gray-700 font-bold mb-1 text-sm flex items-center gap-1">
+                {icon} {label}
+            </label>
             <div className="relative">
                 <input
                     type={inputType}
-                    value={value}
+                    value={value || ''} 
                     disabled={true} 
-                    className="w-full p-2 pr-10 border border-gray-400 rounded-md text-black bg-gray-200 cursor-not-allowed"
+                    className="w-full p-2.5 pr-10 border border-gray-300 rounded-lg text-gray-800 bg-gray-100 cursor-not-allowed focus:outline-none"
                 />
-                
                 {type === 'password' && (
                     <button
                         type="button"
                         onClick={() => setShowPassword(prev => !prev)}
                         className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
                     >
-                        {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        {showPassword ? <EyeIcon className="h-5 w-5" /> : <EyeSlashIcon className="h-5 w-5" />}
                     </button>
                 )}
             </div>
@@ -47,21 +37,62 @@ const ProfileField = ({ label, value, type = 'text' }) => {
     );
 };
 
-
-// PASTIKAN ADA 'export default' DI DEPAN FUNGSI INI
-export default function ProfilePage() { 
+export default function AdminProfilePage() { 
     const router = useRouter();
-    const [profile] = useState(DUMMY_ADMIN_PROFILE);
+    
+    const [profile, setProfile] = useState(null);
+    const [managedFieldName, setManagedFieldName] = useState('Memuat...'); 
+    const [isLoading, setIsLoading] = useState(true);
 
+    // --- 1. LOAD DATA ---
+    useEffect(() => {
+        const sessionUser = JSON.parse(localStorage.getItem('currentUser'));
+
+        if (!sessionUser) {
+            router.push('/admin/login');
+            return;
+        }
+
+        if (sessionUser.role !== 'admin') {
+            alert("Akses Ditolak.");
+            router.push('/login');
+            return;
+        }
+
+        // Ambil data terbaru dari DB
+        const fullAdminData = db.data.admins.find(a => a.id === sessionUser.id);
+        const adminData = fullAdminData || sessionUser;
+
+        setProfile(adminData);
+
+        // --- LOGIKA MENCARI NAMA LOKASI ---
+        if (adminData.fieldId) {
+            // Cari nama lapangan berdasarkan ID
+            const field = db.getFieldById(adminData.fieldId);
+            setManagedFieldName(field ? field.name : `Unknown Field (${adminData.fieldId})`);
+        } else {
+            setManagedFieldName('Global / Super Admin');
+        }
+        
+        setIsLoading(false);
+    }, [router]);
+
+    // --- 2. LOGOUT ---
     const handleLogout = () => {
-        console.log('Admin Logout...');
-        router.push('/admin/login'); 
+        // Hapus sesi
+        localStorage.removeItem('currentUser');
+        
+        // PERUBAHAN DISINI: Redirect ke /login (bukan /admin/login)
+        router.push('/login'); 
     };
+
+    if (isLoading) return <div className="text-center mt-20">Loading...</div>;
+    if (!profile) return null;
 
     return (
         <Layout 
             showHeader={true} 
-            headerTitle="Profil" 
+            headerTitle="Profil Administrator" 
             showSidebar={true}
             showBackButton={true} 
             userRole="admin" 
@@ -73,27 +104,55 @@ export default function ProfilePage() {
                 { label: 'Profil', href: '/admin/profile' },
             ]}
         >
-            <div className="p-4 max-w-lg mx-auto">
-                <div className="bg-gray-100 p-8 rounded-xl shadow-2xl border border-gray-300 mt-8">
+            <div className="p-6 max-w-2xl mx-auto">
+                <div className="bg-white p-8 rounded-xl shadow-xl border border-gray-200 mt-4 relative overflow-hidden">
                     
-                    <div className="flex justify-center mb-6">
-                        <UserCircleIcon className="h-24 w-24 text-gray-500" />
+                    <div className="absolute top-0 left-0 w-full h-2 bg-linear-30 from-red-600 to-orange-500"></div>
+
+                    {/* Header Profil */}
+                    <div className="flex flex-col items-center justify-center mb-8">
+                        <div className="relative">
+                            <div className="p-4 bg-orange-50 rounded-full shadow-sm border border-orange-100 mb-3">
+                                <UserCircleIcon className="h-20 w-20 text-[#E86500]" />
+                            </div>
+                            <div className="absolute bottom-2 right-0 bg-red-600 text-white p-1 rounded-full shadow-md">
+                                <ShieldCheckIcon className="h-5 w-5" />
+                            </div>
+                        </div>
+                        
+                        <h2 className="text-2xl font-bold text-gray-800">{profile.username}</h2>
+                        
+                        {/* BADGE LOKASI */}
+                        <div className="flex items-center gap-1 mt-2 text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">
+                            <MapPinIcon className="w-4 h-4" />
+                            <span className="font-bold">Mengelola: {managedFieldName}</span>
+                        </div>
                     </div>
 
-                    <div className="space-y-4">
-                        
-                        <ProfileField label="UserID" value={profile.userID} />
+                    {/* Form Fields */}
+                    <div className="space-y-5 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                        <ProfileField label="Admin ID" value={profile.id} />
                         <ProfileField label="Username" value={profile.username} />
-                        <ProfileField label="Email" type="email" value={profile.email} />
-                        <ProfileField label="Password" type="password" value={profile.password} />
+                        <ProfileField label="Email Resmi" type="email" value={profile.email} />
+                        
+                        {/* Field Khusus Area Kelolaan */}
+                        <div className="pt-2 border-t border-gray-200">
+                            <ProfileField 
+                                label="Area / Cabang Kelolaan" 
+                                value={`${managedFieldName} (ID: ${profile.fieldId || 'All'})`} 
+                                icon={<MapPinIcon className="w-4 h-4 text-orange-600"/>}
+                            />
+                        </div>
+
+                        <ProfileField label="Password Akses" type="password" value={profile.password} />
                     </div>
                     
-                    <div className="mt-8 flex justify-end">
+                    <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
                         <button
                             onClick={handleLogout}
-                            className="px-6 py-2 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition duration-200 shadow-lg font-mono"
+                            className="flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-200 shadow-lg font-mono"
                         >
-                            Logout
+                            KELUAR (LOGOUT)
                         </button>
                     </div>
                 </div>

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "res-1765113245514",
+    "userId": "u-1765113116783",
+    "courtId": "c-3",
+    "date": "2025-12-08",
+    "timeSlots": [
+      "08.00 - 09.00",
+      "09.00 - 10.00",
+      "11.00 - 12.00"
+    ],
+    "totalPrice": 150000,
+    "status": "canceled",
+    "createdAt": "2025-12-07T13:14:05.514Z",
+    "message": "Dibatalkan oleh Pengguna."
+  },
+  {
+    "id": "res-1765113335761",
+    "userId": "u-1765113116783",
+    "courtId": "c-2",
+    "date": "2025-12-09",
+    "timeSlots": [
+      "08.00 - 09.00",
+      "09.00 - 10.00",
+      "11.00 - 12.00"
+    ],
+    "totalPrice": 300000,
+    "status": "paid",
+    "createdAt": "2025-12-07T13:15:35.761Z",
+    "confirmedAt": "2025-12-07T13:16:33.189Z"
+  }
+]

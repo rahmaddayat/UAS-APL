@@ -1,102 +1,144 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useParams, useRouter } from 'next/navigation';
+import db from '@/services/DatabaseService';
 import dayjs from 'dayjs';
 
-// --- Data Dummy ---
-const MOCK_LOCATIONS = {
-  'sport-center': 'Sport Center',
-  'embassy-sport': 'Embassy Sport Hall',
-};
-
-const DUMMY_RESERVATIONS = [
-  { pemesan: 'Andi', lapangan: 'Lapangan Futsal 1', jadwal: '08.00 - 09.00 WIB' },
-  { pemesan: 'Budi', lapangan: 'Lapangan Futsal 2', jadwal: '08.00 - 10.00 WIB' },
-  { pemesan: 'Charlie', lapangan: 'Lapangan Futsal 1', jadwal: '09.00 - 10.00 WIB' },
-  { pemesan: 'Diana', lapangan: 'Lapangan Futsal 3', jadwal: '10.00 - 12.00 WIB' },
-  { pemesan: 'Edo', lapangan: 'Lapangan Futsal 2', jadwal: '10.00 - 11.00 WIB' },
-];
-
-export default function SlotDetailPage() {
+export default function DailySchedulePage() {
   const params = useParams();
   const router = useRouter();
   
-  const locationId = params.locationId;
-  // Parameter sekarang langsung diambil dari [date]
-  const dateString = params.date; // Format YYYY-MM-DD
-  
-  const locationName = MOCK_LOCATIONS[locationId] || "Nama Tempat";
-  
-  const formattedDate = dayjs(dateString).format('DD-MM-YYYY');
+  const [location, setLocation] = useState(null);
+  const [scheduleRows, setScheduleRows] = useState([]); 
 
-  const handleReservationClick = () => {
-    // Navigasi ke halaman form pemesanan yang baru dibuat
-    router.push(`/reservation/${locationId}/${dateString}/new`);
+  // --- HELPER: Menggabungkan Slot Berurutan ---
+  const mergeTimeSlots = (slots) => {
+    if (!slots || slots.length === 0) return [];
+    
+    const startHours = slots.map(s => parseInt(s.split('.')[0])).sort((a, b) => a - b);
+    
+    let merged = [];
+    if (startHours.length === 0) return [];
+
+    let currentStart = startHours[0];
+    let currentEnd = currentStart + 1;
+
+    for (let i = 1; i < startHours.length; i++) {
+        const nextStart = startHours[i];
+        if (nextStart === currentEnd) {
+            currentEnd = nextStart + 1;
+        } else {
+            merged.push(`${String(currentStart).padStart(2, '0')}.00 - ${String(currentEnd).padStart(2, '0')}.00`);
+            currentStart = nextStart;
+            currentEnd = nextStart + 1;
+        }
+    }
+    merged.push(`${String(currentStart).padStart(2, '0')}.00 - ${String(currentEnd).padStart(2, '0')}.00`);
+    
+    return merged;
   };
 
-  return (
-    <Layout 
-      showHeader={true} 
-      headerTitle={locationName} 
-      showBackButton={true}
-      showSidebar={true}
-    >
-      
-      <div className="bg-white p-6 rounded-lg shadow-xl">
+  useEffect(() => {
+    // 1. Load Data Lokasi & Lapangan
+    const locData = db.getFieldById(params.locationId);
+    setLocation(locData);
+    const courtsData = db.getCourtsByLocation(params.locationId);
+
+    // 2. Load Reservasi
+    const resData = db.getReservationsByDate(params.locationId, params.date);
+    
+    // 3. Load Data User (PERBAIKAN DISINI) 
+    // Jangan ambil dari localStorage manual, ambil langsung dari memory DatabaseService
+    const usersData = db.data.users; 
+
+    // 4. PROSES DATA (Filter & Formatting)
+    let processedRows = [];
+
+    resData.forEach(res => {
+        // A. FILTER: Hanya tampilkan yang statusnya 'paid'
+        if (res.status !== 'paid') return;
+
+        // B. Cari Nama Court & Nama User
+        const courtName = courtsData.find(c => c.id === res.courtId)?.name || "Unknown Field";
         
-        {/* Header Tanggal dan Tombol Reservasi */}
+        // Cari user berdasarkan ID yang ada di reservasi
+        const user = usersData.find(u => u.id === res.userId);
+        const userName = user ? user.username : "Unknown User"; // <--- Nama sekarang akan muncul
+
+        // C. MERGE SLOT
+        const mergedSlots = mergeTimeSlots(res.timeSlots);
+
+        // D. SPLIT BARIS
+        mergedSlots.forEach(slotBlock => {
+            processedRows.push({
+                id: res.id,
+                userName: userName,
+                courtName: courtName,
+                timeSlot: slotBlock 
+            });
+        });
+    });
+
+    // Urutkan jadwal
+    processedRows.sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
+
+    setScheduleRows(processedRows);
+
+  }, [params.locationId, params.date]);
+
+  if (!location) return <div>Loading...</div>;
+
+  return (
+    <Layout showHeader={true} headerTitle={location.name} showBackButton={true} backUrl={`/reservation/${params.locationId}`} showSidebar={true}>
+      <div className="bg-white p-6 rounded-lg shadow-xl min-h-[500px]">
+        
         <div className="flex justify-between items-center mb-6">
-          <p className="text-xl font-bold text-gray-800">{formattedDate}</p>
-          
+          <p className="text-xl font-bold text-gray-800">
+            {dayjs(params.date).format('DD MMMM YYYY')}
+          </p>
           <button 
-            onClick={handleReservationClick} 
-            className="flex items-center bg-[#E86500] hover:bg-[#C95500] text-white font-bold py-2 px-4 rounded-md shadow transition duration-150"
+            onClick={() => router.push(`/reservation/${params.locationId}/${params.date}/new`)} 
+            className="bg-[#E86500] hover:bg-[#C95500] text-white font-bold py-2 px-4 rounded-md shadow"
           >
             RESERVASI +
           </button>
         </div>
 
-        {/* Tabel Reservasi Lain (Sesuai image_4689c4.png) */}
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 border">
             <thead className="bg-gray-100">
               <tr>
-                <th className="py-3 px-6 text-center text-sm font-extrabold text-gray-700 uppercase tracking-wider border border-gray-300">
-                  Pemesan
-                </th>
-                <th className="py-3 px-6 text-center text-sm font-extrabold text-gray-700 uppercase tracking-wider border border-gray-300">
-                  Lapangan
-                </th>
-                <th className="py-3 px-6 text-center text-sm font-extrabold text-gray-700 uppercase tracking-wider border border-gray-300">
-                  Jadwal
-                </th>
+                <th className="py-3 px-6 text-sm font-extrabold text-gray-700 uppercase text-center">Pemesan</th>
+                <th className="py-3 px-6 text-sm font-extrabold text-gray-700 uppercase text-center">Lapangan</th>
+                <th className="py-3 px-6 text-sm font-extrabold text-gray-700 uppercase text-center">Jam Main</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {DUMMY_RESERVATIONS.map((res, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="py-3 px-6 whitespace-nowrap text-sm text-gray-700 text-center border border-gray-300">
-                    {res.pemesan}
-                  </td>
-                  <td className="py-3 px-6 whitespace-nowrap text-sm text-gray-700 text-center border border-gray-300">
-                    {res.lapangan}
-                  </td>
-                  <td className="py-3 px-6 whitespace-nowrap text-sm text-gray-700 text-center border border-gray-300">
-                    {res.jadwal}
-                  </td>
+              {scheduleRows.length > 0 ? (
+                scheduleRows.map((row, index) => (
+                  <tr key={`${row.id}-${index}`} className="hover:bg-gray-50 text-center">
+                    <td className="py-3 px-6 text-sm text-gray-700 font-medium">
+                        {row.userName}
+                    </td>
+                    <td className="py-3 px-6 text-sm text-gray-700">
+                        {row.courtName}
+                    </td>
+                    <td className="py-3 px-6 text-sm font-bold text-blue-600">
+                        {row.timeSlot}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                    <td colSpan="3" className="py-8 text-center text-gray-500 italic">
+                        Belum ada jadwal terkonfirmasi hari ini.
+                    </td>
                 </tr>
-              ))}
-              {[...Array(3)].map((_, index) => (
-                <tr key={`empty-${index}`} className="h-12">
-                  <td className="border border-gray-300"></td>
-                  <td className="border border-gray-300"></td>
-                  <td className="border border-gray-300"></td>
-                </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
-        
       </div>
     </Layout>
   );

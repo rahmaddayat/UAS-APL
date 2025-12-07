@@ -1,80 +1,84 @@
-// src/app/admin/reservation/page.js
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout'; 
-import { BoltIcon } from '@heroicons/react/24/solid';
-import { useRouter } from 'next/navigation'; // Untuk navigasi
-
-// --- DUMMY DATA ---
-// Skenario 1: Daftar reservasi kosong (Gunakan ini untuk melihat tampilan "Tidak ada reservasi")
-// const DUMMY_RESERVATIONS = []; 
-
-// Skenario 2: Ada daftar reservasi (Gunakan ini untuk melihat tampilan daftar card)
-const DUMMY_RESERVATIONS = [
-    {
-        id: 1,
-        fieldName: 'Lapangan Futsal 1',
-        user: 'Budi Santoso',
-        date: '25-11-2025',
-        timeSlot: '18.00 - 19.00 WIB',
-        createdAt: '20-11-2025/10.30 WIB',
-        status: 'pending'
-    },
-    {
-        id: 2,
-        fieldName: 'Lapangan Badminton 2',
-        user: 'Siti Aisyah',
-        date: '26-11-2025',
-        timeSlot: '20.00 - 21.00 WIB',
-        createdAt: '20-11-2025/11.15 WIB',
-        status: 'pending'
-    },
-];
+import { BoltIcon, ClockIcon, MapPinIcon, CalendarIcon, UserIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import db from '@/services/DatabaseService'; 
+import dayjs from 'dayjs';
 
 /**
  * Komponen Card Reservasi (Inline Component)
- * Menampilkan detail reservasi dan dapat diklik untuk navigasi.
  */
 const ReservationCard = ({ reservation, onClick }) => {
-    // Menampilkan ikon berdasarkan jenis lapangan (contoh)
+    // Helper untuk menampilkan emoji lapangan
     const getFieldIcon = (name) => {
         if (name.toLowerCase().includes('futsal')) {
             return '⚽'; 
         } else if (name.toLowerCase().includes('badminton')) {
             return '🏸';
+        } else if (name.toLowerCase().includes('basket')) {
+            return '🏀';
         }
         return '🏟️';
+    };
+
+    // Helper untuk format slot waktu (fungsi tetap ada tapi tidak dipakai di return)
+    const formatTimeSlots = (slots) => {
+        if (!slots || slots.length === 0) return '';
+        const sortedSlots = [...slots].sort();
+        return `${sortedSlots[0].split(' - ')[0]} - ${sortedSlots[sortedSlots.length - 1].split(' - ')[1]} WIB`;
     };
 
     return (
         <div 
             onClick={onClick}
-            className="w-full bg-gray-100 p-4 rounded-lg shadow-md hover:bg-gray-200 transition duration-200 cursor-pointer mb-4 border border-gray-300"
+            // Gaya: Border kiri oranye untuk menarik perhatian
+            className="w-full bg-white p-4 rounded-xl shadow-lg hover:shadow-xl transition duration-200 cursor-pointer 
+                       border-l-4 border-orange-500 hover:border-orange-600 mb-4" 
         >
-            <div className="flex items-start justify-between">
-                {/* Bagian Kiri: Detail Lapangan */}
-                <div className="flex items-center space-x-4">
-                    <span className="text-3xl">{getFieldIcon(reservation.fieldName)}</span>
-                    <div>
-                        <p className="text-lg font-bold font-mono text-gray-800">{reservation.fieldName}</p>
-                        <p className="text-sm font-mono text-gray-600 mt-1">
-                            **User:** {reservation.user}
+            <div className="flex justify-between items-start">
+                
+                {/* Kiri: Icon & Detail Utama */}
+                <div className="flex items-center space-x-4 grow">
+                    {/* Icon Emoji Lapangan */}
+                    <span className="text-4xl opacity-80">{getFieldIcon(reservation.fieldName)}</span>
+                    
+                    <div className='flex flex-col'>
+                        {/* Lokasi (Field Name sebagai Title) */}
+                        <p className="text-xl font-extrabold text-gray-900 leading-tight">
+                            {reservation.fieldName}
                         </p>
-                        <p className="text-sm font-mono text-gray-600">
-                            **Jadwal:** {reservation.date} | {reservation.timeSlot}
-                        </p>
+                        
+                        {/* Detail yang diminta (Lokasi, Pemesan, Tanggal) */}
+                        <div className="mt-3 pt-2 border-t border-gray-100 text-sm font-mono text-gray-700 space-y-1">
+                            
+                            <p>
+                                <span className="font-bold text-gray-800">Lokasi:</span> {reservation.locationName}
+                            </p>
+                            <p>
+                                <span className="font-bold text-gray-800">Pemesan:</span> {reservation.user}
+                            </p>
+                            <p>
+                                <span className="font-bold text-gray-800">Tanggal:</span> {dayjs(reservation.date).format('DD MMM YYYY')}
+                            </p>
+                            {/* SLOT JAM DIHAPUS SESUAI PERMINTAAN */}
+                        </div>
                     </div>
                 </div>
                 
-                {/* Bagian Kanan: Status & Waktu dibuat */}
-                <div className="text-right">
-                    <p className="text-xs text-gray-500 font-mono">
-                        Dibuat pada: {reservation.createdAt}
-                    </p>
-                    <span className="inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 font-mono">
+                {/* Kanan: Status & Timestamp */}
+                <div className="flex flex-col items-end justify-between h-full">
+                    
+                    {/* Status */}
+                    <span className="px-3 py-1 text-sm font-bold rounded-full bg-yellow-50 text-yellow-700 shadow-sm tracking-wider border border-yellow-200">
                         {reservation.status.toUpperCase()}
                     </span>
+                    
+                    {/* Timestamp Reservasi Dibuat */}
+                    <p className="text-xs text-gray-400 font-mono mt-4">
+                        Dibuat: {dayjs(reservation.createdAt).format('DD/MM HH:mm')}
+                    </p>
                 </div>
             </div>
         </div>
@@ -82,44 +86,111 @@ const ReservationCard = ({ reservation, onClick }) => {
 };
 
 
-export default function ReservationPage() {
+export default function AdminReservationPage() {
     const router = useRouter();
-    // Gunakan dummy data di sini
-    const [reservations, setReservations] = useState(DUMMY_RESERVATIONS);
-    
-    // Fungsi untuk mensimulasikan navigasi ke halaman konfirmasi
+    const [reservations, setReservations] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [managedFieldId, setManagedFieldId] = useState(null); 
+
+    // --- 1. LOAD DATA TRANSAKSI ---
+    useEffect(() => {
+        const loadReservations = async () => {
+            setIsLoading(true);
+
+            const sessionUser = JSON.parse(localStorage.getItem('currentUser'));
+            if (!sessionUser || sessionUser.role !== 'admin') {
+                router.push('/admin/login');
+                return;
+            }
+            
+            const adminData = db.data.admins.find(a => a.id === sessionUser.id) || sessionUser;
+            setManagedFieldId(adminData.fieldId);
+            
+            if (!adminData.fieldId) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const allCourts = db.data.courts; 
+                const allFields = db.data.fields;
+                const allUsers = db.data.users;
+
+                const allReservations = await db.fetchReservationsAPI(); 
+                
+                const pendingReservations = allReservations
+                    .filter(res => {
+                        const isPending = res.status === 'pending'; 
+                        const court = allCourts.find(c => c.id === res.courtId);
+                        const isMyField = court && court.fieldId === adminData.fieldId;
+                        
+                        return isPending && isMyField;
+                    })
+                    .map(res => {
+                        const court = allCourts.find(c => c.id === res.courtId);
+                        const location = court ? allFields.find(f => f.id === court.fieldId) : null;
+                        const user = allUsers.find(u => String(u.id) === String(res.userId));
+
+                        return {
+                            id: res.id,
+                            locationName: location ? location.name : 'Unknown Location',
+                            fieldName: court ? court.name : 'Unknown Court',
+                            user: user ? user.username : 'Unknown User',
+                            date: res.date,
+                            timeSlots: res.timeSlots,
+                            createdAt: res.createdAt,
+                            status: res.status,
+                        };
+                    });
+                
+                pendingReservations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                
+                setReservations(pendingReservations);
+
+            } catch (error) {
+                console.error("Error loading reservations:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadReservations();
+    }, [router]);
+
+    // --- 2. HANDLE CARD CLICK (Navigasi ke Detail Konfirmasi) ---
     const handleCardClick = (reservationId) => {
-        // NOTE: Di sini, Anda akan menavigasi ke halaman konfirmasi reservasi
-        // Misalnya: router.push(`/admin/reservation/confirm/${reservationId}`);
-        
-        console.log(`Navigasi ke halaman konfirmasi untuk Reservasi ID: ${reservationId}`);
-        
-        // Contoh navigasi ke halaman dummy:
         router.push(`/admin/reservation/${reservationId}`); 
-        
-        // Karena halaman detail konfirmasi belum ada, ini hanya contoh logging.
     };
 
     return (
         <Layout 
             showHeader={true} 
-            headerTitle="Reservasi" 
+            headerTitle="Reservasi Masuk" 
             showSidebar={true}
             showBackButton={true} 
             userRole="admin"
         >
             <div className="p-4 max-w-4xl mx-auto">
-                <h2 className="text-2xl font-bold mb-6 font-mono text-gray-900">Daftar Reservasi Baru</h2>
+                <h2 className="text-2xl font-bold mb-6 font-mono text-gray-900 border-b pb-2">
+                    Reservasi Baru ({reservations.length})
+                </h2>
                 
-                {reservations.length === 0 ? (
-                    // --- Skenario 1: Tidak Ada Reservasi ---
-                    <div className="text-center p-10 bg-white rounded-lg shadow-lg mt-10">
+                {managedFieldId === null ? (
+                    <div className="text-center p-10 bg-red-50 border border-red-300 text-red-700 rounded-lg shadow-md mt-10">
+                        ⚠️ **Akses Ditolak.** Akun Admin Anda tidak terhubung dengan lokasi lapangan (`fieldId`).
+                    </div>
+                ) : isLoading ? (
+                    <div className="text-center py-20 text-gray-500">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                        Memuat daftar reservasi...
+                    </div>
+                ) : reservations.length === 0 ? (
+                    <div className="text-center p-10 bg-white rounded-lg shadow-lg mt-10 border border-gray-100">
                         <p className="text-xl font-mono text-gray-500">
-                            Tidak ada reservasi dari pelanggan saat ini
+                            Tidak ada reservasi untuk dikonfirmasi di lokasi Anda ({db.getFieldById(managedFieldId)?.name || 'N/A'}).
                         </p>
-                                            </div>
+                    </div>
                 ) : (
-                    // --- Skenario 2: Ada Reservasi (Render Card) ---
                     <div className="space-y-4">
                         {reservations.map((reservation) => (
                             <ReservationCard 
@@ -130,10 +201,6 @@ export default function ReservationPage() {
                         ))}
                     </div>
                 )}
-
-                {/* Catatan: Di tampilan Anda (image_ca6d06.png), ada tampilan sidebar admin. 
-                    Layout komponen sudah menangani hal ini, namun isi utama 
-                    akan mengikuti logika di atas. */}
             </div>
         </Layout>
     );

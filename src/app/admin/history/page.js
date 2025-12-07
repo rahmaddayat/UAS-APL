@@ -1,72 +1,19 @@
-// src/app/admin/history/page.js
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout'; 
-import { CheckCircleIcon } from '@heroicons/react/24/solid'; // Menggunakan ikon cek untuk riwayat
+import { CheckCircleIcon, XCircleIcon, ClockIcon, MapPinIcon, UserIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-
-// --- DUMMY DATA LENGKAP ---
-const ALL_DUMMY_RESERVATIONS = [
-    {
-        id: 1,
-        fieldName: 'Lapangan Futsal 1',
-        user: 'Budi Santoso',
-        date: '25-11-2025',
-        timeSlot: '18.00 - 19.00 WIB',
-        createdAt: '20-11-2025/10.30 WIB',
-        status: 'pending', // Belum dibayar, tidak akan muncul di Riwayat
-        price: 60000,
-    },
-    {
-        id: 2,
-        fieldName: 'Lapangan Badminton 2',
-        user: 'Siti Aisyah',
-        date: '26-11-2025',
-        timeSlot: '20.00 - 21.00 WIB',
-        createdAt: '20-11-2025/11.15 WIB',
-        status: 'paid', // SUDAH DIBAYAR, akan muncul di Riwayat
-        price: 45000,
-    },
-    {
-        id: 3,
-        fieldName: 'Lapangan Futsal 3',
-        user: 'Joko Widodo',
-        date: '27-11-2025',
-        timeSlot: '19.00 - 20.00 WIB',
-        createdAt: '21-11-2025/09.00 WIB',
-        status: 'paid', // SUDAH DIBAYAR, akan muncul di Riwayat
-        price: 60000,
-    },
-    {
-        id: 4,
-        fieldName: 'Lapangan Basket',
-        user: 'Ani Setiadi',
-        date: '28-11-2025',
-        timeSlot: '15.00 - 16.00 WIB',
-        createdAt: '22-11-2025/12.00 WIB',
-        status: 'cancelled', // Dibatalkan, tidak akan muncul di Riwayat Pembayaran
-        price: 70000,
-    },
-];
-
-// Format harga ke mata uang Rupiah
-const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount);
-};
-
+import db from '@/services/DatabaseService'; 
+import dayjs from 'dayjs';
 
 /**
  * Komponen Card Riwayat Reservasi (Inline Component)
  */
-const HistoryReservationCard = ({ reservation }) => {
+// Tambahkan properti onClick
+const HistoryReservationCard = ({ reservation, onClick }) => {
     
-    // Menampilkan ikon berdasarkan jenis lapangan (contoh)
+    // Menampilkan ikon berdasarkan jenis lapangan
     const getFieldIcon = (name) => {
         if (name.toLowerCase().includes('futsal')) {
             return '⚽'; 
@@ -78,37 +25,73 @@ const HistoryReservationCard = ({ reservation }) => {
         return '🏟️';
     };
 
+    // Tentukan styling dan ikon berdasarkan status
+    const isPaid = reservation.status === 'paid';
+    const isCanceled = reservation.status === 'canceled';
+
+    const statusBadge = useMemo(() => {
+        if (isPaid) {
+            return (
+                <span className="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800 font-mono tracking-wider shadow-sm">
+                    <CheckCircleIcon className="h-4 w-4 mr-1"/> SUDAH DIBAYAR
+                </span>
+            );
+        }
+        if (isCanceled) {
+            return (
+                <span className="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-red-100 text-red-800 font-mono tracking-wider shadow-sm">
+                    <XCircleIcon className="h-4 w-4 mr-1"/> DIBATALKAN
+                </span>
+            );
+        }
+        return null;
+    }, [isPaid, isCanceled]);
+
     return (
         <div 
-            // Riwayat biasanya tidak bisa diklik untuk tindakan, hanya detail
-            className="w-full bg-white p-4 rounded-lg shadow-md mb-4 border border-gray-200"
+            // Tambahkan onClick handler dan styling cursor
+            onClick={onClick}
+            className={`w-full bg-white p-4 rounded-xl shadow-lg mb-4 border border-gray-200 cursor-pointer hover:shadow-xl transition 
+                        ${isPaid ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}`}
         >
             <div className="flex items-start justify-between">
-                {/* Bagian Kiri: Detail Lapangan & User */}
+                
+                {/* Kiri: Icon & Detail Utama */}
                 <div className="flex items-center space-x-4">
-                    <span className="text-3xl">{getFieldIcon(reservation.fieldName)}</span>
-                    <div>
-                        <p className="text-lg font-bold font-mono text-gray-800">{reservation.fieldName}</p>
-                        <p className="text-sm font-mono text-gray-600 mt-1">
-                            **Pemesan:** {reservation.user}
+                    <span className="text-4xl opacity-80">{getFieldIcon(reservation.fieldName)}</span>
+                    
+                    <div className='flex flex-col'>
+                        {/* Nama Lapangan (Title) */}
+                        <p className="text-xl font-extrabold text-gray-900 leading-tight">
+                            {reservation.fieldName}
                         </p>
-                        <p className="text-sm font-mono text-gray-600">
-                            **Jadwal:** {reservation.date} | {reservation.timeSlot}
-                        </p>
-                        <p className="text-sm font-mono font-bold text-green-700 mt-1">
-                            **Total Bayar:** {formatCurrency(reservation.price)}
-                        </p>
+                        
+                        {/* Detail yang diminta (Lokasi, Pemesan, Tanggal) */}
+                        <div className="mt-3 pt-2 border-t border-gray-100 text-sm font-mono text-gray-700 space-y-1">
+                            
+                            <p>
+                                <span className="font-bold text-gray-800">Lokasi:</span> {reservation.locationName}
+                            </p>
+                            <p>
+                                <span className="font-bold text-gray-800">Pemesan:</span> {reservation.user}
+                            </p>
+                            <p>
+                                <span className="font-bold text-gray-800">Tanggal:</span> {dayjs(reservation.date).format('DD MMM YYYY')}
+                            </p>
+                        </div>
                     </div>
                 </div>
                 
-                {/* Bagian Kanan: Status Pembayaran */}
+                {/* Kanan: Status & Timestamp */}
                 <div className="text-right flex flex-col items-end">
-                    <p className="text-xs text-gray-500 font-mono mb-2">
-                        Dibuat pada: {reservation.createdAt}
+                    
+                    {/* Status Badge */}
+                    <div className="mb-2">{statusBadge}</div>
+
+                    {/* Timestamp Reservasi Dibuat */}
+                    <p className="text-xs text-gray-400 font-mono mt-4">
+                        Dibuat: {dayjs(reservation.createdAt).format('DD/MM HH:mm')}
                     </p>
-                    <span className="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800 font-mono">
-                        <CheckCircleIcon className="h-4 w-4 mr-1"/> SUDAH DIBAYAR
-                    </span>
                 </div>
             </div>
         </div>
@@ -118,13 +101,90 @@ const HistoryReservationCard = ({ reservation }) => {
 
 export default function HistoryPage() {
     const router = useRouter();
-    // Menggunakan state lokal untuk simulasi
-    const [allReservations] = useState(ALL_DUMMY_RESERVATIONS);
+    const [historyReservations, setHistoryReservations] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [managedFieldId, setManagedFieldId] = useState(null); 
     
-    // Filter reservasi: hanya tampilkan yang sudah dibayar ('paid')
-    const paidReservations = useMemo(() => {
-        return allReservations.filter(res => res.status === 'paid');
-    }, [allReservations]);
+    // --- 1. LOAD DATA RIWAYAT ---
+    useEffect(() => {
+        const loadHistory = async () => {
+            setIsLoading(true);
+
+            // 1. Cek Admin Login & Ambil Field ID
+            const sessionUser = JSON.parse(localStorage.getItem('currentUser'));
+            if (!sessionUser || sessionUser.role !== 'admin') {
+                router.push('/admin/login');
+                return;
+            }
+            
+            const adminData = db.data.admins.find(a => a.id === sessionUser.id) || sessionUser;
+            setManagedFieldId(adminData.fieldId);
+            
+            if (!adminData.fieldId) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                // 2. Load Data Referensi
+                const allCourts = db.data.courts; 
+                const allFields = db.data.fields;
+                const allUsers = db.data.users;
+
+                // 3. Load Reservasi dari API
+                const allReservations = await db.fetchReservationsAPI(); 
+                
+                // 4. Filter & Mapping Data
+                const historyData = allReservations
+                    .filter(res => {
+                        // a. Filter Status: PAID atau CANCELED
+                        const isHistoryStatus = res.status === 'paid' || res.status === 'canceled'; 
+
+                        // b. Filter Lokasi (Hanya yang dikelola admin ini)
+                        const court = allCourts.find(c => c.id === res.courtId);
+                        const isMyField = court && court.fieldId === adminData.fieldId;
+                        
+                        return isHistoryStatus && isMyField;
+                    })
+                    .map(res => {
+                        const court = allCourts.find(c => c.id === res.courtId);
+                        const location = court ? allFields.find(f => f.id === court.fieldId) : null;
+                        const user = allUsers.find(u => String(u.id) === String(res.userId));
+
+                        return {
+                            id: res.id,
+                            locationName: location ? location.name : 'Unknown Location',
+                            fieldName: court ? court.name : 'Unknown Court',
+                            user: user ? user.username : 'Unknown User',
+                            date: res.date,
+                            timeSlots: res.timeSlots,
+                            createdAt: res.createdAt,
+                            status: res.status,
+                            totalPrice: res.totalPrice,
+                            message: res.message || null, 
+                        };
+                    });
+                
+                // Urutkan berdasarkan tanggal dibuat (terbaru di atas)
+                historyData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                
+                setHistoryReservations(historyData);
+
+            } catch (error) {
+                console.error("Error loading history:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadHistory();
+    }, [router]);
+
+    // --- NAVIGASI KE HALAMAN DETAIL RIWAYAT ---
+    const handleCardClick = (reservationId) => {
+        // Mengarahkan ke halaman detail riwayat
+        router.push(`/admin/history/${reservationId}`); 
+    };
 
     return (
         <Layout 
@@ -135,22 +195,33 @@ export default function HistoryPage() {
             userRole="admin"
         >
             <div className="p-4 max-w-4xl mx-auto">
-                <h2 className="text-2xl font-bold mb-6 font-mono text-gray-900">Riwayat Reservasi (Sudah Dibayar)</h2>
+                <h2 className="text-2xl font-bold mb-6 font-mono text-gray-900 border-b pb-2">
+                    Riwayat Reservasi ({historyReservations.length})
+                </h2>
                 
-                {paidReservations.length === 0 ? (
-                    // --- Skenario 1: Tidak Ada Riwayat Pembayaran ---
-                    <div className="text-center p-10 bg-white rounded-lg shadow-lg mt-10">
+                {managedFieldId === null ? (
+                    <div className="text-center p-10 bg-red-50 border border-red-300 text-red-700 rounded-lg shadow-md mt-10">
+                        ⚠️ **Akses Ditolak.** Akun Admin Anda tidak terhubung dengan lokasi lapangan (`fieldId`).
+                    </div>
+                ) : isLoading ? (
+                    <div className="text-center py-20 text-gray-500">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                        Memuat riwayat reservasi...
+                    </div>
+                ) : historyReservations.length === 0 ? (
+                    <div className="text-center p-10 bg-white rounded-lg shadow-lg mt-10 border border-gray-100">
                         <p className="text-xl font-mono text-gray-500">
-                            Tidak ada riwayat reservasi yang sudah dibayar saat ini
+                            Tidak ada riwayat reservasi yang **Sudah Dibayar** atau **Dibatalkan** di lokasi Anda ({db.getFieldById(managedFieldId)?.name || 'N/A'}).
                         </p>
-                                            </div>
+                    </div>
                 ) : (
-                    // --- Skenario 2: Ada Riwayat Pembayaran (Render Card) ---
                     <div className="space-y-4">
-                        {paidReservations.map((reservation) => (
+                        {historyReservations.map((reservation) => (
                             <HistoryReservationCard 
                                 key={reservation.id}
                                 reservation={reservation}
+                                // PASANG onClick handler
+                                onClick={() => handleCardClick(reservation.id)}
                             />
                         ))}
                     </div>

@@ -10,6 +10,7 @@ const USER_MENU_ITEMS = [
     { name: 'Transaksi', href: '/transaction' },
     { name: 'Riwayat', href: '/history' },
     { name: 'Profil', href: '/profile' },
+    { name: 'Notifikasi', href: '/notification' }
 ];
 // Berdasarkan mockup: image_124a3c.png, image_106698.png
 
@@ -18,8 +19,9 @@ const ADMIN_MENU_ITEMS = [
     { name: 'Manajemen', href: '/admin/management' },
     { name: 'Reservasi', href: '/admin/reservation' },
     { name: 'Riwayat', href: '/admin/history' },
-    { name: 'Laporan', href: '/admin/laporan' }, // Asumsi path untuk Laporan
+    { name: 'Laporan', href: '/admin/report' }, 
     { name: 'Profil', href: '/admin/profile' },
+    { name: 'Notifikasi', href: '/admin/notifications' },
 ];
 // Berdasarkan mockup: image_0feef5.png
 

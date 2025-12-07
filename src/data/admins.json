@@ -1,0 +1,16 @@
+[
+  {
+    "id": "a-001",
+    "username": "SuperAdmin",
+    "email": "admin@gmail.com",
+    "password": "admin123",
+    "fieldId": "loc-1" 
+  },
+  {
+    "id": "a-002",
+    "username": "ManagerLapangan",
+    "email": "manager@gmail.com",
+    "password": "admin123",
+    "fieldId": "loc-2"
+  }
+]

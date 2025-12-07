@@ -1,0 +1,68 @@
+[
+  {
+    "id": "notif-a-1765113470322",
+    "refId": "res-1765113335761",
+    "targetUserId": null,
+    "category": "admin",
+    "title": "Pembayaran Diverifikasi",
+    "message": "Status pembayaran #res-1765113335761 diperbarui menjadi Paid.",
+    "type": "success",
+    "timestamp": "2025-12-07T13:17:50.321Z",
+    "isRead": false
+  },
+  {
+    "id": "notif-u-1765113470322",
+    "refId": "res-1765113335761",
+    "targetUserId": "u-1765113116783",
+    "category": "user",
+    "title": "Pembayaran Berhasil 💸",
+    "message": "Terima kasih! Pembayaran untuk #res-1765113335761 telah diverifikasi.",
+    "type": "success",
+    "timestamp": "2025-12-07T13:17:50.321Z",
+    "isRead": false
+  },
+  {
+    "id": "notif-a-1765113393194",
+    "refId": "res-1765113335761",
+    "targetUserId": null,
+    "category": "admin",
+    "title": "Reservasi Disetujui",
+    "message": "Admin menyetujui Reservasi #res-1765113335761.",
+    "type": "success",
+    "timestamp": "2025-12-07T13:16:33.193Z",
+    "isRead": false
+  },
+  {
+    "id": "notif-u-1765113393193",
+    "refId": "res-1765113335761",
+    "targetUserId": "u-1765113116783",
+    "category": "user",
+    "title": "Booking Dikonfirmasi! 🥳",
+    "message": "Hore! Reservasi #res-1765113335761 telah disetujui Admin.",
+    "type": "success",
+    "timestamp": "2025-12-07T13:16:33.193Z",
+    "isRead": false
+  },
+  {
+    "id": "notif-a-1765113287666",
+    "refId": "res-1765113245514",
+    "targetUserId": null,
+    "category": "admin",
+    "title": "Reservasi Ditolak",
+    "message": "Reservasi #res-1765113245514 dibatalkan dengan alasan: Dibatalkan oleh Pengguna.",
+    "type": "error",
+    "timestamp": "2025-12-07T13:14:47.665Z",
+    "isRead": false
+  },
+  {
+    "id": "notif-u-1765113287666",
+    "refId": "res-1765113245514",
+    "targetUserId": "u-1765113116783",
+    "category": "user",
+    "title": "Reservasi Dibatalkan 😔",
+    "message": "Maaf, reservasi #res-1765113245514 ditolak. Alasan: \"Dibatalkan oleh Pengguna.\"",
+    "type": "error",
+    "timestamp": "2025-12-07T13:14:47.665Z",
+    "isRead": false
+  }
+]

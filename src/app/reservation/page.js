@@ -1,24 +1,19 @@
 'use client'; 
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { MapPinIcon } from '@heroicons/react/24/solid'; 
 import { useRouter } from 'next/navigation';
+import db from '@/services/DatabaseService';
 
-// Data Dummy Daftar Lokasi/Pusat Olahraga (TETAP SAMA)
-const DUMMY_LOCATIONS = [
-  { title: 'Sport Center', address: 'Jl. ABC-123-Jakarta', id: 'sport-center' },
-  { title: 'Embassy Sport Hall', address: 'Jl. DEF-456-Bandung', id: 'embassy-sport' },
-  { title: 'ZENS Sport Arena', address: 'Jl. GHI-789-Surabaya', id: 'zens-sport' },
-];
-
-// Komponen LocationCard (TETAP SAMA)
 const LocationCard = ({ title, address, onClick }) => (
     <div 
-        className="bg-white p-4 rounded-lg shadow-md border border-gray-200 cursor-pointer hover:shadow-lg transition duration-200"
+        className="bg-white p-4 rounded-lg shadow-md border border-gray-200 cursor-pointer hover:shadow-lg hover:border-orange-500 transition duration-200"
         onClick={onClick}
     >
         <div className="flex items-center space-x-4">
-            <MapPinIcon className="w-8 h-8 text-gray-500 shrink-0" /> 
-            
+            <div className="bg-orange-100 p-3 rounded-full">
+                <MapPinIcon className="w-6 h-6 text-[#E86500]" /> 
+            </div>
             <div>
                 <h3 className="text-lg font-bold text-gray-900">{title}</h3>
                 <p className="text-sm text-gray-600">{address}</p>
@@ -27,34 +22,26 @@ const LocationCard = ({ title, address, onClick }) => (
     </div>
 );
 
-
 export default function ReservationPage() {
   const router = useRouter();
+  const [locations, setLocations] = useState([]);
+
+  useEffect(() => {
+    setLocations(db.getAllFields());
+  }, []);
   
   return (
-    <Layout 
-      // AKTIFKAN HEADER UNIVERSAL dan berikan judul
-      showHeader={true} 
-      headerTitle="Reservation"
-      
-      // Pastikan Sidebar dan Tombol Kembali disetel
-      showSidebar={true}
-      showBackButton={false} // Halaman utama menu tidak perlu tombol kembali
-    >
-      
-      {/* KONTEN UTAMA: Tanpa Header Kustom */}
+    <Layout showHeader={true} headerTitle="Pilih Lokasi" showSidebar={true} showBackButton={false}>
       <div className="space-y-4">
-        {DUMMY_LOCATIONS.map((location, index) => (
+        {locations.map((loc) => (
           <LocationCard 
-            key={index}
-            title={location.title}
-            address={location.address}
-            // NAVIGASI BARU: Ke halaman detail lokasi
-            onClick={() => router.push(`/reservation/${location.id}`)} 
+            key={loc.id}
+            title={loc.name}
+            address={loc.address}
+            onClick={() => router.push(`/reservation/${loc.id}`)} 
           />
         ))}
       </div>
-          
     </Layout>
   );
 }

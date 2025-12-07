@@ -1,0 +1,28 @@
+[
+  {
+    "id": "c-1",
+    "fieldId": "loc-1",
+    "name": "Lapangan Futsal A1",
+    "pricePerHour": 90000,
+    "type": "Futsal"
+  },
+  {
+    "id": "c-3",
+    "fieldId": "loc-1",
+    "name": "Lapangan Badminton 1",
+    "pricePerHour": 50000
+  },
+  {
+    "id": "c-4",
+    "fieldId": "loc-2",
+    "name": "Basket Indoor",
+    "pricePerHour": 200000
+  },
+  {
+    "id": "c-1765113565312",
+    "fieldId": "loc-1",
+    "name": "Lapangan Futsal 2",
+    "pricePerHour": 100000,
+    "type": "Futsal"
+  }
+]
